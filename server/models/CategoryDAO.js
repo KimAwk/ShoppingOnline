@@ -9,6 +9,13 @@ const CategoryDAO = {
     return categories;
   },
 
+  // === CHỈ THÊM THEO HÌNH ===
+  async selectByID(_id) {
+    const category = await Models.Category.findById(_id).exec();
+    return category;
+  },
+  // =========================
+
   async insert(category) {
     const mongoose = require('mongoose');
     category._id = new mongoose.Types.ObjectId();
@@ -18,7 +25,11 @@ const CategoryDAO = {
 
   async update(category) {
     const newvalues = { name: category.name };
-    const result = await Models.Category.findByIdAndUpdate(category._id, newvalues, { new: true });
+    const result = await Models.Category.findByIdAndUpdate(
+      category._id,
+      newvalues,
+      { new: true }
+    );
     return result;
   },
 

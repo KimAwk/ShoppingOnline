@@ -3,10 +3,14 @@ const router = express.Router();
 
 // utils
 const JwtUtil = require('../utils/JwtUtil');
+const EmailUtil = require('../utils/EmailUtil');
 
 // daos
 const AdminDAO = require('../models/AdminDAO');
-const CategoryDAO = require('../models/CategoryDao');
+const CategoryDAO = require('../models/CategoryDAO');
+const ProductDAO = require('../models/ProductDAO');
+const OrderDAO = require('../models/OrderDAO');
+const CustomerDAO = require('../models/CustomerDAO');
 
 // login
 router.post('/login', async function (req, res) {
@@ -29,6 +33,36 @@ router.post('/login', async function (req, res) {
 router.get('/token', JwtUtil.checkToken, function (req, res) {
   const token = req.headers['x-access-token'] || req.headers['authorization'];
   res.json({ success: true, message: 'Token is valid', token: token });
+});
+
+// customer
+router.get('/customers', JwtUtil.checkToken, async function (req, res) {
+  const customers = await CustomerDAO.selectAll();
+  res.json(customers);
+});
+
+// customer sendmail
+router.get('/customers/sendmail/:id', JwtUtil.checkToken, async function (req, res) {
+  const _id = req.params.id;
+  const cust = await CustomerDAO.selectByID(_id);
+  if (cust) {
+    const send = await EmailUtil.send(cust.email, cust._id, cust.token);
+    if (send) {
+      res.json({ success: true, message: 'Please check email' });
+    } else {
+      res.json({ success: false, message: 'Email failure' });
+    }
+  } else {
+    res.json({ success: false, message: 'Not exists customer' });
+  }
+});
+
+// customer deactive
+router.put('/customers/deactive/:id', JwtUtil.checkToken, async function (req, res) {
+  const _id = req.params.id;
+  const token = req.body.token;
+  const result = await CustomerDAO.active(_id, token, 0);
+  res.json(result);
 });
 
 // category
@@ -55,6 +89,77 @@ router.put('/categories/:id', JwtUtil.checkToken, async function (req, res) {
 router.delete('/categories/:id', JwtUtil.checkToken, async function (req, res) {
   const _id = req.params.id;
   const result = await CategoryDAO.delete(_id);
+  res.json(result);
+});
+
+// product
+router.get('/products', JwtUtil.checkToken, async function (req, res) {
+  let products = await ProductDAO.selectAll();
+
+  const sizePage = 4;
+  const noPages = Math.ceil(products.length / sizePage);
+  let curPage = 1;
+  if (req.query.page) curPage = parseInt(req.query.page);
+  if (curPage < 1) curPage = 1;
+
+  const offset = (curPage - 1) * sizePage;
+  products = products.slice(offset, offset + sizePage);
+
+  const result = { products: products, noPages: noPages, curPage: curPage };
+  res.json(result);
+});
+
+router.post('/products', JwtUtil.checkToken, async function (req, res) {
+  const name = req.body.name;
+  const price = req.body.price;
+  const cid = req.body.category;
+  const image = req.body.image;
+  const now = new Date().getTime();
+
+  const category = await CategoryDAO.selectByID(cid);
+  const product = { name: name, price: price, image: image, cdate: now, category: category };
+  const result = await ProductDAO.insert(product);
+  res.json(result);
+});
+
+router.put('/products/:id', JwtUtil.checkToken, async function (req, res) {
+  const _id = req.params.id;
+  const name = req.body.name;
+  const price = req.body.price;
+  const cid = req.body.category;
+  const image = req.body.image;
+  const now = new Date().getTime();
+
+  const category = await CategoryDAO.selectByID(cid);
+  const product = { _id: _id, name: name, price: price, image: image, cdate: now, category: category };
+  const result = await ProductDAO.update(product);
+  res.json(result);
+});
+
+router.delete('/products/:id', JwtUtil.checkToken, async function (req, res) {
+  const _id = req.params.id;
+  const result = await ProductDAO.delete(_id);
+  res.json(result);
+});
+
+// get all orders
+router.get('/orders', JwtUtil.checkToken, async function (req, res) {
+  const orders = await OrderDAO.selectAll();
+  res.json(orders);
+});
+
+// get orders by customer id
+router.get('/orders/customer/:cid', JwtUtil.checkToken, async function (req, res) {
+  const _cid = req.params.cid;
+  const orders = await OrderDAO.selectByCustID(_cid);
+  res.json(orders);
+});
+
+// update status
+router.put('/orders/status/:id', JwtUtil.checkToken, async function (req, res) {
+  const _id = req.params.id;
+  const newStatus = req.body.status;
+  const result = await OrderDAO.update(_id, newStatus);
   res.json(result);
 });
 
